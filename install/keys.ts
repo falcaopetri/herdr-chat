@@ -24,10 +24,10 @@ import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "nod
 import { join } from "node:path";
 
 type Json = any;
-export const NAMES = ["open", "pi", "claude", "codex", "continue"] as const;
+export const NAMES = ["open", "pi", "claude", "codex", "devin", "continue"] as const;
 export type Name = (typeof NAMES)[number];
-export const ACTION: Record<Name, string> = { open: "mod.open:new-chat", pi: "new-chat.pi", claude: "new-chat.claude", codex: "new-chat.codex", continue: "new-chat.continue" };
-export const TITLE: Record<Name, string> = { open: "New chat", pi: "Pi chat", claude: "Claude Code chat", codex: "Codex chat", continue: "Continue as chat" };
+export const ACTION: Record<Name, string> = { open: "mod.open:new-chat", pi: "new-chat.pi", claude: "new-chat.claude", codex: "new-chat.codex", devin: "new-chat.devin", continue: "new-chat.continue" };
+export const TITLE: Record<Name, string> = { open: "New chat", pi: "Pi chat", claude: "Claude Code chat", codex: "Codex chat", devin: "Devin chat", continue: "Continue as chat" };
 
 export type Own = { [chord: string]: { action: string; was: string | null } };
 export type Record2 = { version: 2; global: Own };

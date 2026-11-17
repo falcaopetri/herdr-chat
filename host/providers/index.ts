@@ -2,9 +2,11 @@
 import { PiAdapter } from "./pi/adapter.ts";
 import { ClaudeAdapter } from "./claude/adapter.ts";
 import { CodexAdapter } from "./codex/adapter.ts";
+import { DevinAdapter } from "./devin/adapter.ts";
 import { piTuiSession } from "./pi/tui.ts";
 import { claudeTuiSession } from "./claude/tui.ts";
 import { codexTuiSession } from "./codex/tui.ts";
+import { devinTuiSession } from "./devin/tui.ts";
 import type { ProviderAdapter, AdapterOptions } from "./types.ts";
 import type { TuiQuery, TuiSession } from "./tui.ts";
 
@@ -19,6 +21,7 @@ export const PROVIDERS: Record<string, Factory> = {
   pi: { command: "pi", create: (o) => new PiAdapter(o), tuiSession: piTuiSession },
   claude: { command: "claude", create: (o) => new ClaudeAdapter(o), tuiSession: claudeTuiSession },
   codex: { command: "codex", create: (o) => new CodexAdapter(o), tuiSession: codexTuiSession },
+  devin: { command: "devin", create: (o) => new DevinAdapter(o), tuiSession: devinTuiSession },
 };
 
 export function tuiSession(provider: string, q: TuiQuery): TuiSession {

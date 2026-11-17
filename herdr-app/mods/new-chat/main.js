@@ -3,7 +3,7 @@
 // As an overlay (`mod.open:new-chat`, the "open" key: cmd-i): Pi, Claude
 // Code or Codex, then a new tab with the chat (mod chat, props {chat, cwd,
 // provider}) for the focused terminal's folder (else the space's). Keys:
-// p / c / x pick (only an agent that is installed; the launcher has no text
+// p / c / x / d pick (only an agent that is installed; the launcher has no text
 // field, so letters are always picks), 1/2/3 too, ↑↓ move, Enter opens the
 // selected one (the last choice, kept in <appHome>/data/herdr-chat/launcher.json),
 // Esc closes. Its commands: `new-chat.pick:<provider>`, `new-chat.enter`.
@@ -12,7 +12,7 @@
 // install/layout.ts): always on screen at no size, so it takes the commands a
 // key or another mod runs while no launcher is open:
 // - `new-chat.open`: the launcher (as mod.open:new-chat; again: closes it);
-// - `new-chat.pi`, `new-chat.claude`, `new-chat.codex`: that agent's chat, in a new tab;
+// - `new-chat.pi`, `new-chat.claude`, `new-chat.codex`, `new-chat.devin`: that agent's chat, in a new tab;
 // - `new-chat.continue:<terminal>`: chat-menu's Continue as chat (an agent's
 //   TUI handed over to a chat on its session, see continueAsChat);
 //   `new-chat.continue`: the same on the focused terminal (the "continue" key);
@@ -32,6 +32,7 @@ const CHOICES = [
   { id: "pi", label: "Pi", icon: "pi", tint: true, letter: "p" },
   { id: "claude", label: "Claude Code", icon: "claude", letter: "c" },
   { id: "codex", label: "Codex", icon: "codex", letter: "x" },
+  { id: "devin", label: "Devin", icon: "devin.png", letter: "d" },
 ];
 const PREFS = () => `${appHome()}/data/herdr-chat/launcher.json`;
 
@@ -52,7 +53,7 @@ const base = (p) => String(p ?? "").split("/").pop();
 const NAMES = Object.fromEntries(CHOICES.map((c) => [c.id, c.label]));
 
 // Herdr's names for the agents (its status reports Claude Code as claude-code) → ours.
-const HERDR_AGENTS = { pi: "pi", claude: "claude", "claude-code": "claude", codex: "codex" };
+const HERDR_AGENTS = { pi: "pi", claude: "claude", "claude-code": "claude", codex: "codex", devin: "devin" };
 
 /** The agent a terminal runs, as Herdr reports it (an id of CHOICES), else null. */
 export function agentOf(t) {
@@ -202,7 +203,8 @@ class Commands {
     const updates = async (now = false) => {
       try {
         await checkRunning();
-        if (!(await checkHosts())) await checkRelease({ now });
+        // The release lookup only when asked (`new-chat.update-check`): no automatic checks.
+        if (!(await checkHosts()) && now) await checkRelease({ now });
       } catch (e) {
         notify({ title: "herdr-chat update", body: String(e?.message ?? e), level: "error" });
       }
@@ -253,7 +255,7 @@ export default class NewChat extends View {
     cx.spawn(async (cx) => {
       try {
         const last = JSON.parse((await readTextFile(PREFS())) ?? "{}").last;
-        const i = CHOICES.findIndex((c) => c.id === last);
+        const i = this.choices().findIndex((c) => c.id === last);
         if (i >= 0) this.sel = i;
       } catch {}
       this.handle.focus();
@@ -271,7 +273,7 @@ export default class NewChat extends View {
       for (;;) {
         const c = await nextCommand();
         if (c === "focus") this.handle.focus();
-        else if (c.startsWith("pick:")) this.open(CHOICES.findIndex((x) => x.id === c.slice(5)), cx);
+        else if (c.startsWith("pick:")) this.open(this.choices().findIndex((x) => x.id === c.slice(5)), cx);
         else if (c === "enter") this.open(this.sel, cx);
         cx.notify();
       }
@@ -283,10 +285,16 @@ export default class NewChat extends View {
     return this.installed?.[c.id] !== false;
   }
 
+  // What the launcher lists: only the agents that are installed.
+  choices() {
+    return CHOICES.filter((c) => this.available(c));
+  }
+
   open(i, cx) {
-    if (this.done || i < 0 || i >= CHOICES.length) return;
+    const list = this.choices();
+    if (this.done || i < 0 || i >= list.length) return;
     this.done = true;
-    const provider = CHOICES[i].id;
+    const provider = list[i].id;
     const overlay = props()?.overlay;
     cx.spawn(async () => {
       try {
@@ -301,11 +309,12 @@ export default class NewChat extends View {
 
   key(e, cx) {
     const k = e.keystroke;
-    const letter = CHOICES.findIndex((c) => c.letter === k && this.available(c));
+    const list = this.choices();
+    const letter = list.findIndex((c) => c.letter === k);
     if (letter >= 0) this.open(letter, cx);
     else if (/^[1-9]$/.test(k)) this.open(Number(k) - 1, cx);
-    else if (k === "up") this.sel = (this.sel + CHOICES.length - 1) % CHOICES.length;
-    else if (k === "down" || k === "tab") this.sel = (this.sel + 1) % CHOICES.length;
+    else if (k === "up") this.sel = (this.sel + list.length - 1) % (list.length || 1);
+    else if (k === "down" || k === "tab") this.sel = (this.sel + 1) % (list.length || 1);
     else if (k === "enter") this.open(this.sel, cx);
     else if (k === "escape") { const o = props()?.overlay; if (o) closeOverlay(o); }
     cx.notify();
@@ -316,19 +325,20 @@ export default class NewChat extends View {
     if (this.update) return this.update.render(this.handle);
     const t = theme();
     const mark = (c) => {
-      const path = `mods/chat/icons/providers/${c.icon}.svg`;
+      const path = `mods/chat/icons/providers/${c.icon.includes(".") ? c.icon : `${c.icon}.svg`}`;
       return (c.tint ? svg(path).text_color(t.foreground) : image(path)).size(18).flex_none();
     };
-    const letters = CHOICES.filter((c) => this.available(c)).map((c) => c.letter.toUpperCase()).join(" ");
+    const list = this.choices();
+    const letters = list.map((c) => c.letter.toUpperCase()).join(" ");
     return v_flex().id("launcher").size_full().p(8).gap(2).bg(t.popover).text_color(t.foreground)
       .track_focus(this.handle).on_key_down((e, cx) => this.key(e, cx))
       .child(div().px(8).pt(4).pb(6).text_size(11.5).text_color(t.dim).child("New chat"))
-      .children(CHOICES.map((c, i) => h_flex().id(`choice-${c.id}`).h(36).px(10).gap(10).items_center().rounded(8).cursor_pointer()
+      .children(list.map((c, i) => h_flex().id(`choice-${c.id}`).h(36).px(10).gap(10).items_center().rounded(8).cursor_pointer()
         .when(i === this.sel, (e) => e.bg(t.selected))
         .hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.open(i, cx))
         .child(mark(c))
-        .child(div().flex_1().text_size(13).text_color(this.available(c) ? t.foreground : t.dim).child(this.available(c) ? c.label : `${c.label} (not installed)`))
-        .when(this.available(c), (e) => e.child(div().px(5).rounded(4).border_1().border_color(t.border).bg(t.raised).text_size(11).text_color(t.dim).child(c.letter.toUpperCase())))))
+        .child(div().flex_1().text_size(13).text_color(t.foreground).child(c.label))
+        .child(div().px(5).rounded(4).border_1().border_color(t.border).bg(t.raised).text_size(11).text_color(t.dim).child(c.letter.toUpperCase()))))
       .child(div().px(8).pt(6).text_size(10.5).text_color(t.dim).child(`${letters} or ↑↓ Enter · Esc`));
   }
 }

@@ -336,7 +336,7 @@ test("install.sh: --no-subagents writes no templates and no notes; a plain insta
   assert.match(out, /Claude Code: no .* \(not installed\)/);
   // The summary names what changed: the notes (Pi's and Codex's, not Claude Code's), the templates, the extension.
   assert.match(out, /^ {2}notes {6}\S*\/pi\/AGENTS\.md, ~\/\.codex\/AGENTS\.md$/m);
-  assert.match(out, /^ {2}templates  pi-chat claude-chat codex-chat in /m);
+  assert.match(out, /^ {2}templates  pi-chat claude-chat codex-chat( devin-chat)? in /m);
   assert.match(out, /^ {2}extension  \S*\/pi\/extensions\/herdr-chat-lock\.ts /m);
   assert.ok(!existsSync(join(d, "home", ".claude")));
   assert.ok(JSON.parse(read(app, "mine")).floating.some((f: any) => f.content?.mod === "new-chat"), "new-chat's copy in the layout");
